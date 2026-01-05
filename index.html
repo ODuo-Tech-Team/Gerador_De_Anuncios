@@ -105,7 +105,7 @@
 
             <form id="adForm" class="space-y-6">
                 <!-- Grid de inputs -->
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <!-- Oferta Principal -->
                     <div>
                         <label for="oferta" class="block text-sm font-medium text-gray-300 mb-2">
@@ -149,6 +149,27 @@
                             class="w-full px-4 py-3 bg-gray-900 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
                             required
                         >
+                    </div>
+
+                    <!-- Estilo Visual (Opcional) -->
+                    <div>
+                        <label for="estilo_visual" class="block text-sm font-medium text-gray-300 mb-2">
+                            Estilo Visual
+                            <span class="text-gray-500 font-normal">(opcional)</span>
+                        </label>
+                        <select
+                            id="estilo_visual"
+                            name="estilo_visual"
+                            class="w-full px-4 py-3 bg-gray-900 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                        >
+                            <option value="">Selecione um estilo...</option>
+                            <option value="Realista">Realista</option>
+                            <option value="Minimalista">Minimalista</option>
+                            <option value="Ilustracao">Ilustração</option>
+                            <option value="Corporativo">Corporativo</option>
+                            <option value="Moderno">Moderno</option>
+                            <option value="Flat Design">Flat Design</option>
+                        </select>
                     </div>
                 </div>
 
@@ -210,7 +231,7 @@
     <footer class="border-t border-gray-800 mt-12">
         <div class="max-w-6xl mx-auto px-4 py-6">
             <p class="text-center text-sm text-gray-500">
-                Powered by OpenAI GPT-4o | Growth Team Tool
+                AdBlast AI v1.1 | Powered by OpenAI GPT-4o + DALL-E 3 | Growth Team Tool
             </p>
         </div>
     </footer>
@@ -220,7 +241,7 @@
         // CONFIGURAÇÃO
         // =============================================
         const API_URL = 'http://localhost:5000';
-        const REQUEST_TIMEOUT = 60000; // 60 segundos
+        const REQUEST_TIMEOUT = 180000; // 180 segundos (DALL-E pode demorar)
 
         // Tipos de variação (sincronizado com o prompt do backend)
         const VARIATION_TYPES = [
@@ -307,7 +328,7 @@
          */
         function setLoading(isLoading) {
             generateBtn.disabled = isLoading;
-            btnText.textContent = isLoading ? 'Gerando...' : 'Gerar Variações';
+            btnText.textContent = isLoading ? 'Gerando textos e imagens...' : 'Gerar Variações';
             btnIcon.classList.toggle('hidden', isLoading);
             btnSpinner.classList.toggle('hidden', !isLoading);
         }
@@ -352,12 +373,59 @@
         }
 
         /**
+         * Faz download da imagem
+         */
+        async function downloadImage(imageUrl, filename) {
+            try {
+                showToast('Iniciando download...');
+                const response = await fetch(imageUrl);
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename || 'ad-image.png';
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                a.remove();
+                showToast('Download concluído!');
+            } catch (error) {
+                console.error('Erro no download:', error);
+                // Fallback: abrir em nova aba
+                window.open(imageUrl, '_blank');
+                showToast('Imagem aberta em nova aba', 'error');
+            }
+        }
+
+        /**
          * Cria um card de anúncio
          */
         function createAdCard(ad, index) {
             const delayClass = `delay-${index + 1}`;
             const fullText = `${ad.titulo}\n\n${ad.descricao}\n\nCTA: ${ad.cta}`;
             const variationType = VARIATION_TYPES[index] || VARIATION_TYPES[0];
+            const hasImage = ad.image_url && ad.image_url !== null;
+
+            // Seção da imagem (se existir)
+            const imageSection = hasImage ? `
+                <div class="mb-4 relative group">
+                    <img
+                        src="${ad.image_url}"
+                        alt="Imagem do anúncio ${index + 1}"
+                        class="w-full h-48 object-cover rounded-lg border border-gray-700"
+                        loading="lazy"
+                    >
+                    <button
+                        onclick="downloadImage('${ad.image_url}', 'anuncio-${index + 1}.png')"
+                        class="absolute bottom-2 right-2 bg-gray-900/80 hover:bg-gray-800 text-white p-2 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                        title="Baixar imagem"
+                    >
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                        </svg>
+                    </button>
+                </div>
+            ` : '';
 
             return `
                 <div class="bg-gray-800 rounded-xl border border-gray-700 p-6 hover:border-primary-500/50 transition-all duration-200 fade-in opacity-0 ${delayClass}">
@@ -379,6 +447,9 @@
                         </button>
                     </div>
 
+                    <!-- Imagem (se disponível) -->
+                    ${imageSection}
+
                     <!-- Título -->
                     <div class="mb-4">
                         <div class="flex items-center justify-between">
@@ -392,7 +463,7 @@
                     <div class="mb-4">
                         <div class="flex items-center justify-between">
                             <label class="text-xs text-gray-500 uppercase tracking-wider">Descrição</label>
-                            <span class="text-xs text-gray-600">${ad.descricao.length}/125</span>
+                            <span class="text-xs text-gray-600">${ad.descricao.length}/250</span>
                         </div>
                         <p class="text-gray-300 mt-1 text-sm leading-relaxed">${ad.descricao}</p>
                     </div>
@@ -446,10 +517,13 @@
             }
 
             // Coleta os dados do formulário
+            const estiloVisual = document.getElementById('estilo_visual').value;
             const formData = {
                 oferta: document.getElementById('oferta').value.trim(),
                 cliente: document.getElementById('cliente').value.trim(),
-                nicho: document.getElementById('nicho').value.trim()
+                nicho: document.getElementById('nicho').value.trim(),
+                estilo_visual: estiloVisual,
+                generate_images: true
             };
 
             setLoading(true);
